@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Pessoas</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Bootstrap CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts: Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+        }
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Poppins', Arial, Helvetica, sans-serif;
+        }
+        main.container {
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        #highlight-person {
+            font-size: 6em;
+            font-weight: bold;
+            text-align: center;
+            margin: 32px 0;
+            min-height: 2.5em;
+            background-color: #1ba760;
+            transition: height 0.3s;
+            height: 365px;
+            border-radius: 25px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+            color: white;
+        }
+        #highlight-container {
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Input para API Key no canto superior direito -->
+    <input
+        id="apikey-input"
+        type="password"
+        placeholder="API Key"
+        style="position: absolute; top: 20px; right: 30px; z-index: 1000; width: 220px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccc; font-family: 'Poppins', Arial, Helvetica, sans-serif;"
+    />
+
+    <main class="container d-flex flex-column" style="min-height: 100vh;">
+        <!-- Texto acima do destaque -->
+        <div id="highlight-container" class="d-flex flex-column align-items-center justify-content-center flex-shrink-1" style="transition: height 0.3s;">
+            <div class="text-secondary mb-2" style="font-size: 1.1rem; padding-top: 25px">
+                Quem vai fazer a daily hoje é
+            </div>
+            <div id="highlight-person" class="mb-4 w-100 d-flex align-items-center justify-content-center" style="min-height:2.5em;"></div>
+        </div>
+        <section class="flex-grow-1">
+            <h5>Pessoas</h5>
+            <ul id="person-list" class="list-group">
+                <!-- Pessoas adicionadas aparecerão aqui -->
+            </ul>
+        </section>
+        <section class="mb-4">
+            <form id="person-form" class="row g-2">
+                <div class="col-auto flex-grow-1">
+                    <input type="text" id="person-input" class="form-control" placeholder="Nome da pessoa" required>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Adicionar</button>
+                </div>
+            </form>
+        </section>
+    </main>
+    <!-- Bootstrap JS (opcional, para componentes interativos) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Substitua pelo seu endpoint do jsonbin.io
+        const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/68b9a77bae596e708fe26286'; // Exemplo: https://api.jsonbin.io/v3/b/abc123
+        let JSONBIN_TOKEN = '';
+        const apikeyInput = document.getElementById('apikey-input');
+
+        // Carrega a API Key do localStorage se existir
+        if (localStorage.getItem('jsonbin_apikey')) {
+            JSONBIN_TOKEN = localStorage.getItem('jsonbin_apikey');
+            apikeyInput.value = JSONBIN_TOKEN;
+            if (JSONBIN_TOKEN) fetchPeople();
+        }
+
+        // Atualiza a API Key ao digitar
+        apikeyInput.addEventListener('change', function () {
+            JSONBIN_TOKEN = apikeyInput.value.trim();
+            if (JSONBIN_TOKEN) {
+                localStorage.setItem('jsonbin_apikey', JSONBIN_TOKEN);
+                fetchPeople();
+            }
+        });
+
+        // Seleciona elementos
+        const form = document.getElementById('person-form');
+        const input = document.getElementById('person-input');
+        const list = document.getElementById('person-list');
+        const highlight = document.getElementById('highlight-person');
+
+        // Estado local
+        let people = [];
+
+        // Função para buscar dados do JSONBin
+        async function fetchPeople() {
+            if (!JSONBIN_TOKEN) {
+                people = [];
+                renderListAndAdjust();
+                return;
+            }
+            try {
+                const res = await fetch(JSONBIN_URL + '/latest', {
+                    headers: {
+                        'X-Master-Key': JSONBIN_TOKEN
+                    }
+                });
+                if (!res.ok) throw new Error('Erro ao buscar dados');
+                const data = await res.json();
+                people = data.record.people || [];
+                renderListAndAdjust();
+            } catch (err) {
+                people = [];
+                renderListAndAdjust();
+            }
+        }
+
+        // Função para salvar dados no JSONBin
+        async function savePeople() {
+            if (!JSONBIN_TOKEN) return;
+            await fetch(JSONBIN_URL, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': JSONBIN_TOKEN
+                },
+                body: JSON.stringify({ people })
+            });
+        }
+
+        // Renderiza a lista na tela
+        function renderList() {
+            list.innerHTML = '';
+            people.forEach((person, idx) => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex align-items-center position-relative';
+
+                // Checkbox
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'form-check-input me-2';
+                checkbox.checked = !!person.checked;
+
+                // Evento para mostrar/remover data e atualizar JSONBin
+                checkbox.addEventListener('change', function () {
+                    if (checkbox.checked) {
+                        person.checked = true;
+                        person.date = new Date().toLocaleString('pt-BR');
+                    } else {
+                        person.checked = false;
+                        delete person.date;
+                    }
+                    savePeople();
+                    renderList();
+                    updateHighlight();
+                });
+
+                li.appendChild(checkbox);
+
+                // Nome editável
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = person.name;
+                nameSpan.style.cursor = 'pointer';
+                nameSpan.className = 'flex-grow-1';
+                nameSpan.addEventListener('click', function () {
+                    if (person.checked) return; // Não permite editar se marcado
+                    const inputEdit = document.createElement('input');
+                    inputEdit.type = 'text';
+                    inputEdit.value = person.name;
+                    inputEdit.className = 'form-control form-control-sm d-inline w-auto ms-2';
+                    nameSpan.replaceWith(inputEdit);
+                    inputEdit.focus();
+
+                    inputEdit.addEventListener('blur', saveEdit);
+                    inputEdit.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') {
+                            saveEdit();
+                        }
+                    });
+
+                    function saveEdit() {
+                        const newName = inputEdit.value.trim();
+                        if (newName) {
+                            person.name = newName;
+                            savePeople().then(renderList);
+                        } else {
+                            renderList();
+                        }
+                    }
+                });
+                li.appendChild(nameSpan);
+
+                // Data da marcação
+                if (person.checked && person.date) {
+                    const dateSpan = document.createElement('span');
+                    dateSpan.className = 'ms-auto check-date text-secondary small';
+                    dateSpan.textContent = person.date;
+                    li.appendChild(dateSpan);
+                }
+
+                // Botão de excluir (apenas se não estiver marcado)
+                if (!person.checked) {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'btn btn-sm btn-link text-danger position-absolute top-0 end-0';
+                    deleteBtn.innerHTML = '&times;';
+                    deleteBtn.title = 'Excluir pessoa';
+                    deleteBtn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        people.splice(idx, 1);
+                        savePeople().then(renderList);
+                    });
+                    li.appendChild(deleteBtn);
+                }
+
+                list.appendChild(li);
+            });
+            updateHighlight();
+        }
+
+        // Atualiza o destaque central
+        function updateHighlight() {
+            let found = false;
+            for (let i = 0; i < people.length; i++) {
+                if (!people[i].checked) {
+                    highlight.textContent = people[i].name;
+                    found = true;
+                    break;
+                }
+            }
+            // Se todos estão marcados, desmarque todos e mostre o primeiro novamente
+            if (!found && people.length > 0) {
+                people.forEach(p => {
+                    p.checked = false;
+                    delete p.date;
+                });
+                savePeople().then(() => {
+                    renderList();
+                });
+                highlight.textContent = people[0].name;
+            } else if (people.length === 0) {
+                highlight.style.fontSize = '1.5em';
+                highlight.textContent = 'Não encontrei esse time =(';
+            }
+        }
+
+        // Adiciona pessoa na lista
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const name = input.value.trim();
+            if (name) {
+                people.push({ name, checked: false });
+                await savePeople();
+                renderList();
+                input.value = '';
+            }
+        });
+
+        // Ajusta dinamicamente a altura do destaque para caber tudo na tela
+        function adjustHighlightHeight() {
+            const container = document.getElementById('highlight-container');
+            const main = document.querySelector('main.container');
+            const checklist = document.querySelector('section.flex-grow-1');
+            const formSection = document.querySelector('section.mb-4');
+
+            // Espaço total disponível
+            const mainRect = main.getBoundingClientRect();
+            const checklistRect = checklist.getBoundingClientRect();
+            const formRect = formSection.getBoundingClientRect();
+
+            // Espaço ocupado pelos outros elementos
+            const usedHeight = checklist.offsetHeight + formSection.offsetHeight + 64; // 64px margem extra
+
+            // Calcula altura máxima possível para o destaque
+            let maxHighlight = window.innerHeight - usedHeight;
+            if (maxHighlight < 120) maxHighlight = 120; // mínimo visual
+
+            // Limita a 70vh se houver espaço
+            const seventyVh = window.innerHeight * 0.7;
+            container.style.height = Math.min(maxHighlight, seventyVh) + 'px';
+        }
+
+        // Chame após renderizar a lista e ao redimensionar
+        function renderListAndAdjust() {
+            renderList();
+            adjustHighlightHeight();
+        }
+
+        // Substitua todas as chamadas para renderList() por renderListAndAdjust()
+        // Exemplo:
+        // fetchPeople().then(renderListAndAdjust);
+        // Ou, se fetchPeople não for async:
+        // fetchPeople();
+        // renderListAndAdjust();
+
+        // Atualize as chamadas:
+        // - fetchPeople() → fetchPeople().then(renderListAndAdjust);
+        // - renderList() → renderListAndAdjust();
+
+        // Exemplo de atualização:
+        async function fetchPeople() {
+            if (!JSONBIN_TOKEN) {
+                people = [];
+                renderListAndAdjust();
+                return;
+            }
+            try {
+                const res = await fetch(JSONBIN_URL + '/latest', {
+                    headers: {
+                        'X-Master-Key': JSONBIN_TOKEN
+                    }
+                });
+                if (!res.ok) throw new Error('Erro ao buscar dados');
+                const data = await res.json();
+                people = data.record.people || [];
+                renderListAndAdjust();
+            } catch (err) {
+                people = [];
+                renderListAndAdjust();
+            }
+        }
+
+        // E no resto do código, troque renderList() por renderListAndAdjust()
+
+        // Ajusta ao redimensionar a janela
+        window.addEventListener('resize', adjustHighlightHeight);
+
+        // Inicializa
+        fetchPeople();
+    </script>
+</body>
+</html>
