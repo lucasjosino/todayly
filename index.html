@@ -103,14 +103,24 @@
         let JSONBIN_TOKEN = '';
         const apikeyInput = document.getElementById('apikey-input');
 
-        // Carrega a API Key do localStorage se existir
-        if (localStorage.getItem('jsonbin_apikey')) {
-            JSONBIN_TOKEN = localStorage.getItem('jsonbin_apikey');
-            apikeyInput.value = JSONBIN_TOKEN;
-            if (JSONBIN_TOKEN) fetchPeople();
+        // Função para pegar parâmetro da URL
+        function getUrlParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
         }
 
-        // Atualiza a API Key ao digitar
+        // Prioridade: 1) URL param, 2) localStorage
+        const urlApiKey = getUrlParam('apikey');
+        if (urlApiKey) {
+            JSONBIN_TOKEN = urlApiKey;
+            apikeyInput.value = JSONBIN_TOKEN;
+            apikeyInput.style.display = 'none'; // Esconde o input se a key veio da URL
+        } else if (localStorage.getItem('jsonbin_apikey')) {
+            JSONBIN_TOKEN = localStorage.getItem('jsonbin_apikey');
+            apikeyInput.value = JSONBIN_TOKEN;
+        }
+
+        // Atualiza a API Key ao digitar (só funciona se input estiver visível)
         apikeyInput.addEventListener('change', function () {
             JSONBIN_TOKEN = apikeyInput.value.trim();
             if (JSONBIN_TOKEN) {
